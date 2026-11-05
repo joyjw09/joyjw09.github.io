@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>프레임 물리 실험실</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: 한 화면 도구. 조작 → 점프 2칸 → 한 줄 이유 → 결과 */
+:root {
+  --bg: #f3f5f7; --surface: #ffffff; --fg: #14181d; --muted: #5a636e;
+  --line: #dce1e6; --grid: #eceff2; --exact: #7d8690; --ground: #c9cfd6; --pit: #e6e9ed;
+  --s1: #2a78d6; --s2: #eb6834; --ok: #1f7a4d; --bad: #b3261e;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111417; --surface: #1a1e22; --fg: #e8ebee; --muted: #9aa3ad;
+    --line: #2c3238; --grid: #23282d; --exact: #8a939d; --ground: #4a525b; --pit: #15181b;
+    --s1: #3987e5; --s2: #d95926; --ok: #4cc38a; --bad: #f2867e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111417; --surface: #1a1e22; --fg: #e8ebee; --muted: #9aa3ad;
+  --line: #2c3238; --grid: #23282d; --exact: #8a939d; --ground: #4a525b; --pit: #15181b;
+  --s1: #3987e5; --s2: #d95926; --ok: #4cc38a; --bad: #f2867e;
+  color-scheme: dark;
+}
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+.wrap {
+  max-width: 960px; margin: 0 auto;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 16px;
+}
+h1 { margin: 0; font-size: 24px; letter-spacing: -0.01em; }
+.sub { margin: 4px 0 0; color: var(--muted); font-size: 15px; max-width: 64ch; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 14px 28px; align-items: flex-end; }
+.group { display: flex; flex-direction: column; gap: 6px; }
+.label { font-size: 13px; color: var(--muted); }
+button { font: inherit; font-size: 14px; color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 7px 13px; cursor: pointer; }
+button:hover { background: var(--grid); }
+button:focus-visible, input:focus-visible, label:focus-within { outline: 2px solid var(--s1); outline-offset: 2px; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; font-family: var(--font-mono); font-size: 14px; padding: 7px 13px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--surface); }
+.tg { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; cursor: pointer; border-radius: 6px; padding: 6px 0; }
+.tg input { accent-color: var(--fg); width: 16px; height: 16px; }
+.play { display: flex; gap: 8px; }
+.play .main { background: var(--fg); color: var(--surface); border-color: var(--fg); min-width: 92px; }
+.lanes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@media (max-width: 700px) { .lanes { grid-template-columns: minmax(0, 1fr); } }
+.lane { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.lanehead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; }
+.lanehead .nm { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; }
+.badge { font-size: 14px; font-weight: 500; }
+.badge.ok { color: var(--ok); } .badge.bad { color: var(--bad); }
+canvas { display: block; width: 100%; border-radius: 6px; background: var(--bg); }
+.lanefoot { font-family: var(--font-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.why { margin: 0; font-size: 16px; line-height: 1.7; background: var(--bg); border-radius: 8px; padding: 14px 16px; }
+.why b { font-weight: 700; }
+.why .n { font-family: var(--font-mono); font-weight: 700; }
+.tlhead { font-size: 15px; }
+.tlnote { margin: 0; font-size: 14px; color: var(--muted); }
+#tl { background: transparent; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>프레임 물리 실험실</h1>
+    <p class="sub">게임은 1초를 여러 프레임으로 나누고, 프레임마다 캐릭터 위치를 계산해요. 프레임 수를 바꿔 가며 같은 점프가 어떻게 달라지는지 비교해 보세요.</p>
+  </header>
+
+  <section class="panel" aria-label="조작">
+    <div class="controls">
+      <div class="group">
+        <span class="label">1초에 그리는 프레임 수 (fps)</span>
+        <div class="seg" id="fpsSeg" role="group" aria-label="1초에 그리는 프레임 수"></div>
+      </div>
+      <label class="tg"><input type="checkbox" id="fixed"> 고정 시간 간격 켜기 (해결책)</label>
+      <div class="play">
+        <button class="main" id="playBtn">▶ 재생</button>
+        <button id="resetBtn">처음부터</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="점프 화면">
+    <div class="lanes" id="lanes"></div>
+    <div class="legend">
+      <span><svg width="14" height="14" aria-hidden="true"><rect x="2" y="2" width="10" height="10" rx="2" fill="var(--muted)" opacity=".35"/></svg>네모 하나 = 화면에 그린 프레임 하나</span>
+      <span><svg width="22" height="10" aria-hidden="true"><line x1="0" x2="22" y1="5" y2="5" stroke="var(--exact)" stroke-width="2" stroke-dasharray="5 4"/></svg>실제 물리라면 지나갈 길</span>
+    </div>
+    <p class="why" id="why"></p>
+  </section>
+
+  <section class="panel" aria-label="화면 그리기와 점프 계산 시점">
+    <div class="tlhead"><b>처음 0.2초 동안</b> 화면을 그리는 시점과 점프를 계산하는 시점</div>
+    <canvas id="tl" role="img" aria-label="화면 그리기와 점프 계산 눈금"></canvas>
+    <p class="tlnote" id="tlnote"></p>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  // =====================================================================
+  //  물리 계산 — 한 프레임(dt초) 뒤의 상태.  s = { x, y, vx, vy },  G = 중력가속도
+  // =====================================================================
+  const G = 10;
+  // 오일러 방법(게임 방식): 프레임 사이 동안 "지금 속도 그대로" 간다고 계산
+  function gameStep(s, dt) {
+    return { x: s.x + s.vx * dt, y: s.y + s.vy * dt, vx: s.vx, vy: s.vy - G * dt };
+  }
+  // 정확한 공식: 등가속도 공식 s = v·t + ½·a·t²
+  function exactStep(s, dt) {
+    return { x: s.x + s.vx * dt, y: s.y + s.vy * dt - 0.5 * G * dt * dt, vx: s.vx, vy: s.vy - G * dt };
+  }
+  // =====================================================================
+
+  const START = { x: 0, y: 0, vx: 3, vy: 5 };
+  const exact = (t) => ({ x: 3 * t, y: 5 * t - 5 * t * t });
+  const PEAK = 1.25, LAND = 3, LEDGE = [2.7, 3.2], START_EDGE = 0.15, FIXED_H = 1 / 60, PIT = -1;
+  const METHODS = [
+    { id: "game",  name: "오일러 방법 (게임 방식)",   step: gameStep,  color: "--s1" },
+    { id: "exact", name: "등가속도 공식 (정확한 공식)", step: exactStep, color: "--s2" }
+  ];
+  const FPS = [10, 30, 60, 120, 240];
+  let fps = 10, fixed = false, runs = {}, tCur = Infinity, playing = false, lastTs = 0;
+
+  function run(step, f, useFixed) {
+    let s = { ...START }, done = 0, landX = null, ok = false, end = false, peak = 0;
+    const frames = [{ t: 0, s: { ...s } }], pts = [{ t: 0, s: { ...s } }];
+    const phys = (h) => {
+      const prev = s; s = step(s, h); done++; peak = Math.max(peak, s.y);
+      pts.push({ t: done * h, s: { ...s } });
+      if (s.vy < 0 && s.y <= 1e-9 && prev.y > 1e-9) {
+        landX = s.x;
+        if ((s.x >= LEDGE[0] && s.x <= LEDGE[1]) || s.x <= START_EDGE) { s = { ...s, y: 0, vx: 0, vy: 0 }; ok = true; end = true; }
+      } else if (s.y <= PIT) end = true;
+    };
+    for (let i = 1; i <= Math.ceil(2.5 * f); i++) {
+      if (useFixed) { const need = Math.floor((i / f) * 60 + 1e-9); while (done < need && !end) phys(FIXED_H); }
+      else phys(1 / f);
+      frames.push({ t: i / f, s: { ...s } });
+      if (end) break;
+    }
+    return { frames, pts, peak, landX, ok };
+  }
+
+  const col = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const fmt = (x, d = 2) => (Math.round(x * 10 ** d) / 10 ** d).toFixed(d);
+  const cm = (x) => { const v = Math.round(x * 1000) / 10; return Math.abs(v) < 0.05 ? "0 cm" : (v > 0 ? "+" : "") + (Math.abs(v) >= 10 ? Math.round(v) : v.toFixed(1)) + " cm"; };
+  function hexA(hex, a) { const h = hex.replace("#", ""); const n = parseInt(h, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+  function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  function visible(r) { let n = 0; while (n < r.frames.length && r.frames[n].t <= tCur + 1e-9) n++; return Math.max(1, n); }
+
+  const WX0 = -0.6, WX1 = 4.4, WY0 = -1.05, WY1 = 2.1;
+  function drawLane(m) {
+    const cv = $("cv-" + m.id); if (!cv) return;
+    const W = cv.clientWidth || 320, H = Math.round(W * (WY1 - WY0) / (WX1 - WX0)), dpr = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    cv.style.height = H + "px";
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    const sc = W / (WX1 - WX0), X = (x) => (x - WX0) * sc, Y = (y) => (WY1 - y) * sc, c = col(m.color);
+    ctx.strokeStyle = col("--grid"); ctx.fillStyle = col("--muted"); ctx.lineWidth = 1;
+    ctx.font = `10px ${col("--font-mono") || "monospace"}`; ctx.textBaseline = "middle";
+    [0.5, 1, 1.5].forEach(h => { ctx.beginPath(); ctx.moveTo(0, Y(h)); ctx.lineTo(W, Y(h)); ctx.stroke(); ctx.fillText(h + "m", 3, Y(h) - 7); });
+    ctx.fillStyle = col("--pit"); ctx.fillRect(0, Y(0), W, H - Y(0));
+    ctx.fillStyle = col("--ground"); ctx.fillRect(0, Y(0), X(START_EDGE), H - Y(0)); ctx.fillRect(X(LEDGE[0]), Y(0), X(LEDGE[1]) - X(LEDGE[0]), H - Y(0));
+    ctx.fillStyle = col("--muted"); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.font = `11px ${col("--font-body") || "sans-serif"}`;
+    ctx.fillText("좁은 발판", (X(LEDGE[0]) + X(LEDGE[1])) / 2, Y(0) + 6); ctx.textAlign = "left";
+    ctx.strokeStyle = col("--exact"); ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.beginPath();
+    for (let i = 0; i <= 100; i++) { const p = exact(i / 100); i ? ctx.lineTo(X(p.x), Y(p.y)) : ctx.moveTo(X(p.x), Y(p.y)); }
+    ctx.stroke(); ctx.setLineDash([]);
+    // 네모(잔상) = 화면에 그린 프레임,  선 = 점프를 계산한 위치를 이은 것
+    // → 고정 시간 간격이면 네모 개수는 fps대로, 선은 fps와 상관없이 같은 모양
+    const r = runs[m.id], n = visible(r), tShow = r.frames[n - 1].t + 1e-9;
+    let np = 0; while (np < r.pts.length && r.pts[np].t <= tShow) np++;
+    const stride = Math.max(1, Math.ceil(r.frames.length / 28)), bw = 0.24 * sc, bh = 0.34 * sc;
+    for (let i = 0; i < n - 1; i += stride) { const s = r.frames[i].s; ctx.fillStyle = hexA(c, 0.2); ctx.strokeStyle = hexA(c, 0.6); rr(ctx, X(s.x) - bw / 2, Y(s.y) - bh, bw, bh, 3); ctx.fill(); ctx.stroke(); }
+    ctx.strokeStyle = hexA(c, 0.9); ctx.lineWidth = 1.5; ctx.beginPath();
+    for (let i = 0; i < np; i++) { const s = r.pts[i].s; i ? ctx.lineTo(X(s.x), Y(s.y)) : ctx.moveTo(X(s.x), Y(s.y)); }
+    ctx.stroke();
+    const cur = r.frames[n - 1].s; ctx.fillStyle = c; rr(ctx, X(cur.x) - bw / 2, Y(cur.y) - bh, bw, bh, 3); ctx.fill();
+  }
+
+  function drawAll() {
+    METHODS.forEach(m => {
+      drawLane(m);
+      const r = runs[m.id], done = visible(r) >= r.frames.length, b = $("b-" + m.id);
+      if (!done) { b.className = "badge"; b.textContent = ""; }
+      else if (r.ok) { b.className = "badge ok"; b.textContent = "✓ 발판에 착지"; }
+      else { b.className = "badge bad"; b.textContent = "✗ 발판을 놓침"; }
+      $("f-" + m.id).textContent = `최고 높이 ${fmt(r.peak, 2)} m (${cm(r.peak - PEAK)}) · 착지 ${r.landX == null ? "–" : fmt(r.landX, 2) + " m"} (${r.landX == null ? "–" : cm(r.landX - LAND)})`;
+    });
+  }
+
+  function renderWhy() {
+    const g = runs.game;
+    if (fixed) {
+      const rel = fps < 60 ? `화면을 한 번 그릴 때마다 점프 계산을 <b>${60 / fps}번</b> 몰아서 해요.`
+        : fps > 60 ? `점프 계산 한 번마다 화면을 <b>${fps / 60}번</b> 그려요.`
+        : `화면 그리기와 점프 계산 간격이 똑같아요.`;
+      $("why").innerHTML = `<b>고정 시간 간격</b>: 화면은 1초에 ${fps}번 그리지만, 점프 계산은 화면과 따로 <b>항상 1초에 60번</b>(1/60초마다) 해요. ${rel} 계산 간격이 늘 같으니까 fps를 바꿔도 점프 결과가 <b>항상 같아요</b> (오일러 방법 최고 높이 <span class="n">${cm(g.peak - PEAK)}</span>). 오차는 남지만 모든 플레이어에게 똑같아서 공평해요.`;
+      return;
+    }
+    const dt = 1 / fps, n = Math.round(0.5 / dt), per = 0.5 * G * dt * dt;
+    const dtTxt = fps === 10 ? "0.1초" : `1/${fps}초`;
+    $("why").innerHTML = `<b>왜 차이가 날까?</b> 오일러 방법(게임 방식)은 프레임 사이(${dtTxt}) 동안 <b>속도가 그대로라고 생각하고</b> 계산해요. 실제로는 그사이에도 중력 때문에 속도가 계속 줄어드는데 그걸 놓치니까, 프레임마다 <span class="n">${(() => { const c = per * 100; return (c >= 1 ? "" : "약 ") + (c >= 1 ? c.toFixed(1) : c >= 0.1 ? c.toFixed(2) : c.toFixed(3)) + " cm"; })()}</span>씩 더 올라가요. 꼭대기까지 ${n}프레임이 쌓이면 <span class="n">${cm(g.peak - PEAK).replace("+", "")}</span> 더 높아져요. 프레임 수가 적을수록 이 차이가 커져요.`;
+  }
+
+  // 아래 눈금: 처음 0.2초 동안 화면을 그리는 시점 vs 점프를 계산하는 시점
+  function drawTimeline() {
+    const cv = $("tl"), W = cv.clientWidth || 320, H = 124, dpr = window.devicePixelRatio || 1;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    cv.style.height = H + "px";
+    const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    const narrow = W < 520, L = narrow ? 8 : 150, R = W - 14, SPAN = 0.2, T = (t) => L + (R - L) * t / SPAN;
+    const calcN = fixed ? 60 : fps;
+    const rows = [
+      { name: "화면 그리기", sub: `1초에 ${fps}번`, n: fps, y: narrow ? 30 : 24, color: col("--fg") },
+      { name: "점프 계산", sub: `1초에 ${calcN}번`, n: calcN, y: narrow ? 78 : 76, color: col("--s1") }
+    ];
+    ctx.textBaseline = "middle";
+    rows.forEach(rw => {
+      ctx.strokeStyle = col("--line"); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(L, rw.y); ctx.lineTo(R, rw.y); ctx.stroke();
+      ctx.fillStyle = col("--fg"); ctx.font = `700 13px ${col("--font-body") || "sans-serif"}`; ctx.textAlign = "left";
+      if (narrow) { ctx.fillText(`${rw.name} · ${rw.sub}`, L, rw.y - 18); }
+      else { ctx.fillText(rw.name, 0, rw.y - 7); ctx.fillStyle = col("--muted"); ctx.font = `12px ${col("--font-body") || "sans-serif"}`; ctx.fillText(rw.sub, 0, rw.y + 9); }
+      ctx.strokeStyle = rw.color; ctx.lineWidth = rw.n >= 120 ? 1.5 : 2.5;
+      for (let k = 0; k <= Math.round(rw.n * SPAN); k++) { const x = T(k / rw.n); ctx.beginPath(); ctx.moveTo(x, rw.y - 9); ctx.lineTo(x, rw.y + 9); ctx.stroke(); }
+    });
+    ctx.fillStyle = col("--muted"); ctx.font = `11px ${col("--font-mono") || "monospace"}`; ctx.textAlign = "center";
+    [0, 0.1, 0.2].forEach(t => ctx.fillText(t === 0 ? "0초" : t + "초", Math.min(Math.max(T(t), L + 12), R - 12), H - 8));
+    $("tlnote").textContent = fixed
+      ? "고정 시간 간격을 켜면 아래 줄(점프 계산)은 fps를 바꿔도 그대로예요. 위 줄(화면 그리기)만 바뀌어요."
+      : "지금은 화면을 그릴 때마다 점프 계산도 한 번 해요. 그래서 fps가 바뀌면 계산 간격도 같이 바뀌어요.";
+  }
+
+  function refresh() {
+    runs = {}; METHODS.forEach(m => { runs[m.id] = run(m.step, fps, fixed); });
+    $("fpsSeg").innerHTML = FPS.map(f => `<button id="fps-${f}" data-f="${f}" aria-pressed="${f === fps}">${f}</button>`).join("");
+    tCur = Infinity; drawAll(); renderWhy(); drawTimeline();
+  }
+  $("lanes").innerHTML = METHODS.map(m => `
+    <div class="lane">
+      <div class="lanehead"><span class="nm"><svg width="12" height="12" aria-hidden="true"><rect width="12" height="12" rx="2" fill="var(${m.color})"/></svg>${m.name}</span><span class="badge" id="b-${m.id}"></span></div>
+      <canvas id="cv-${m.id}" role="img" aria-label="${m.name}로 계산한 점프"></canvas>
+      <div class="lanefoot" id="f-${m.id}"></div>
+    </div>`).join("");
+  $("fpsSeg").addEventListener("click", (e) => { const b = e.target.closest("[data-f]"); if (!b) return; fps = +b.dataset.f; stop(); refresh(); });
+  $("fixed").addEventListener("change", (e) => { fixed = e.target.checked; stop(); refresh(); });
+
+  function stop() { playing = false; $("playBtn").textContent = "▶ 재생"; }
+  function finished() { return METHODS.every(m => visible(runs[m.id]) >= runs[m.id].frames.length); }
+  function tick(ts) {
+    if (!playing) return;
+    tCur += Math.min(0.05, (ts - lastTs) / 1000) * 0.45; lastTs = ts;
+    drawAll();
+    if (finished()) { stop(); tCur = Infinity; drawAll(); return; }
+    requestAnimationFrame(tick);
+  }
+  function play() {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { tCur = Infinity; drawAll(); return; }
+    if (finished()) tCur = 0;
+    playing = true; $("playBtn").textContent = "❚❚ 일시정지"; lastTs = performance.now(); requestAnimationFrame(tick);
+  }
+  $("playBtn").addEventListener("click", () => { playing ? stop() : play(); });
+  $("resetBtn").addEventListener("click", () => { stop(); tCur = 0; drawAll(); play(); });
+  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { drawAll(); drawTimeline(); }, 80); });
+  const redraw = () => { drawAll(); drawTimeline(); };
+  const mq = matchMedia("(prefers-color-scheme: dark)"); if (mq.addEventListener) mq.addEventListener("change", redraw);
+  new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  refresh();
+})();
+</script>
+</body>
+</html>
